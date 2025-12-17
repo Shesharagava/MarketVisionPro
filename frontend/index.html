@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>MarketVision Pro — Live + ML</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link rel="stylesheet" href="../styles.css" />
+</head>
+
+<body class="min-h-screen bg-gradient-to-br from-slate-900 via-indigo-900 to-violet-900 text-slate-100">
+  <div class="max-w-7xl mx-auto p-6">
+    <header class="mb-6 flex items-center justify-between">
+      <div>
+        <h1 class="text-3xl font-bold">📈 MarketVision Pro</h1>
+        <p class="text-slate-300">Live watchlist + Prophet predictions</p>
+      </div>
+      <div class="text-right">
+        <div class="text-sm text-slate-300">Backend:</div>
+        <input id="baseUrl" class="mt-1 w-64 bg-transparent border border-white/10 rounded px-2 py-1 text-sm"
+          value="http://127.0.0.1:8000" />
+      </div>
+    </header>
+
+    <section class="mb-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div class="glass rounded-xl p-4">
+        <label for="watchlistInput" class="text-sm text-slate-300">Watchlist (comma separated)</label>
+        <input id="watchlistInput"
+          class="mt-2 w-full rounded-md bg-transparent border border-white/10 px-3 py-2 text-slate-100"
+          value="AAPL,MSFT,AMZN,GOOGL,TSLA,NVDA,JPM,META,INTC,KO" />
+        <div class="mt-3 flex gap-2">
+          <button id="applyWatchlistBtn" class="bg-green-500 hover:bg-green-600 px-4 py-2 rounded-md font-semibold">
+            Apply
+          </button>
+          <button id="refreshNowBtn" class="bg-amber-500 hover:bg-amber-600 px-3 py-2 rounded-md text-sm">
+            Refresh Now
+          </button>
+        </div>
+      </div>
+      <div class="glass rounded-xl p-4">
+        <div class="text-sm text-slate-300">Selected</div>
+        <div id="selectedTicker" class="text-xl font-bold mt-1">AAPL</div>
+        <div id="selectedPrice" class="text-2xl mt-2 font-bold">$--</div>
+        <div id="selectedChange" class="mt-1 text-sm neutral">--</div>
+      </div>
+      <div class="glass rounded-xl p-4">
+        <div class="text-sm text-slate-300">Forecast settings</div>
+        <div class="mt-2 flex items-center gap-2">
+          <label for="days" class="text-sm text-slate-300">Days:</label>
+          <input id="days" type="number" min="1" max="30" value="7"
+            class="w-16 bg-transparent border border-white/10 rounded px-2 py-1 text-sm" />
+          <button id="predictBtn" class="bg-indigo-500 hover:bg-indigo-600 px-3 py-2 rounded-md text-sm">
+            Predict
+          </button>
+        </div>
+        <div id="predictMsg" class="text-xs text-slate-400 mt-2"></div>
+      </div>
+
+      <!-- Glossary Card -->
+      <div class="glass rounded-xl p-4">
+        <div class="text-sm text-slate-300">Financial Encyclopedia</div>
+        <div class="mt-2 flex gap-2">
+          <input id="glossaryInput" placeholder="e.g. EBITDA"
+            class="flex-1 bg-transparent border border-white/10 rounded px-2 py-1 text-sm text-white focus:outline-none focus:border-indigo-500" />
+          <button id="searchGlossaryBtn" class="bg-indigo-500 hover:bg-indigo-600 px-3 py-2 rounded-md text-sm">
+            Search
+          </button>
+        </div>
+        <div id="glossaryResult" class="mt-2 text-xs text-slate-300 italic min-h-[1.5em]"></div>
+      </div>
+    </section>
+
+    <section id="cardsContainer" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6"></section>
+
+    <!-- STRATEGY BACKTESTER SECTION -->
+    <section class="glass rounded-xl p-6 mb-6">
+      <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 gap-4">
+        <div>
+          <h2 class="text-xl font-bold">🛠 Strategy Backtester</h2>
+          <p class="text-slate-300 text-sm">Simulate SMA Crossover Strategy on data</p>
+        </div>
+        <div class="flex flex-wrap gap-3 items-end">
+          <div>
+            <label class="block text-xs text-slate-400">Mode</label>
+            <select id="btMode" class="bg-slate-800 border border-white/10 rounded px-2 py-1 text-sm text-white">
+              <option value="SYNTHETIC">Synthetic Data</option>
+              <option value="REAL">Current Symbol</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs text-slate-400">Short SMA</label>
+            <input type="number" id="btShort" value="10"
+              class="w-16 bg-transparent border border-white/10 rounded px-2 py-1 text-sm">
+          </div>
+          <div>
+            <label class="block text-xs text-slate-400">Long SMA</label>
+            <input type="number" id="btLong" value="50"
+              class="w-16 bg-transparent border border-white/10 rounded px-2 py-1 text-sm">
+          </div>
+          <div>
+            <label class="block text-xs text-slate-400">Capital ($)</label>
+            <input type="number" id="btCapital" value="10000" step="1000"
+              class="w-24 bg-transparent border border-white/10 rounded px-2 py-1 text-sm">
+          </div>
+          <button id="runBacktestBtn"
+            class="bg-pink-500 hover:bg-pink-600 text-white px-4 py-1.5 rounded-md font-semibold text-sm">
+            Run Backtest
+          </button>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
+        <!-- Metrics -->
+        <div class="lg:col-span-1 space-y-4">
+          <div class="bg-slate-800/50 p-4 rounded-lg">
+            <div class="text-xs text-slate-400">Total Return</div>
+            <div id="btReturn" class="text-2xl font-bold">--%</div>
+          </div>
+          <div class="bg-slate-800/50 p-4 rounded-lg">
+            <div class="text-xs text-slate-400">Max Drawdown</div>
+            <div id="btDrawdown" class="text-2xl font-bold text-red-400">--%</div>
+          </div>
+          <div class="bg-slate-800/50 p-4 rounded-lg">
+            <div class="text-xs text-slate-400">Trades Executed</div>
+            <div id="btTrades" class="text-2xl font-bold">--</div>
+          </div>
+          <div id="btMsg" class="text-xs text-amber-300"></div>
+        </div>
+
+        <!-- Backtest Chart -->
+        <div class="lg:col-span-3 bg-slate-800/30 rounded-lg p-2">
+          <canvas id="backtestChart" height="80"></canvas>
+        </div>
+      </div>
+    </section>
+
+    <section class="glass rounded-xl p-4">
+      <div class="flex items-center justify-between mb-2">
+        <h2 class="text-lg font-semibold">Historical + Forecast</h2>
+        <div class="text-sm text-slate-400">
+          Data: /api/daily & /api/predict
+        </div>
+      </div>
+      <canvas id="mainChart" height="40"></canvas>
+      <div id="chartNotice" class="mt-3 text-sm text-slate-300">
+        Click a card to load history; press Predict to overlay forecast.
+      </div>
+    </section>
+  </div>
+
+  <div id="chatbot"
+    class="hidden fixed bottom-24 right-6 w-80 h-[500px] bg-slate-800 rounded-xl shadow-2xl flex flex-col border border-white/10 z-50">
+    <div class="p-4 border-b border-white/10 flex justify-between items-center bg-slate-700 rounded-t-xl">
+      <h3 class="m-0 text-white font-bold">🤖 Market Bot</h3>
+      <button id="closeChatBtn" class="text-white hover:text-gray-300 text-xl font-bold">&times;</button>
+    </div>
+
+    <div id="chatMessages" class="flex-1 overflow-y-auto p-4 flex flex-col gap-3">
+      <div class="self-start bg-slate-700 text-white p-3 rounded-lg max-w-[85%] text-sm">
+        Hello! I am your AI Market Assistant. Ask me about market news or sentiments!
+      </div>
+    </div>
+
+    <form id="chatForm" class="p-4 border-t border-white/10 flex gap-2">
+      <input id="chatInput" type="text" placeholder="Ask about market news..."
+        class="flex-1 p-2 rounded-md bg-slate-700 text-white border border-slate-600 focus:outline-none focus:border-indigo-500 text-sm" />
+      <button type="submit" class="bg-green-500 hover:bg-green-600 text-white p-2 rounded-md font-bold text-sm">
+        Send
+      </button>
+    </form>
+  </div>
+
+  <footer>
+    <button id="chatbotTriggerBtn" style="
+          width: 60px;
+          height: 60px;
+          border-radius: 50%;
+          background-color: rgb(66, 153, 225);
+          color: white;
+          border: none;
+          box-shadow: rgba(0, 0, 0, 0.3) 0px 4px 10px;
+          cursor: pointer;
+          font-size: 1.5rem;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          position: fixed;
+          bottom: 20px;
+          right: 20px;
+          z-index: 40;
+        ">
+      💬
+    </button>
+  </footer>
+  <script src="app.js"></script>
+</body>
+
+</html>

@@ -1,0 +1,8 @@
+.glass { 
+  background: rgba(255,255,255,0.08); 
+  backdrop-filter: blur(6px); 
+  border: 1px solid rgba(255,255,255,0.06); 
+}
+.positive { color: #16a34a; }
+.negative { color: #dc2626; }
+.neutral  { color: #94a3b8; }

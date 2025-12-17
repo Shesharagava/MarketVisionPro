@@ -1,0 +1,11 @@
+fastapi
+uvicorn
+pandas
+yfinance
+prophet
+torch
+transformers
+nltk
+vaderSentiment
+langchain-ollama
+langchain
