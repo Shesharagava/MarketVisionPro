@@ -74,67 +74,7 @@
 
     <section id="cardsContainer" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6"></section>
 
-    <!-- STRATEGY BACKTESTER SECTION -->
-    <section class="glass rounded-xl p-6 mb-6">
-      <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 gap-4">
-        <div>
-          <h2 class="text-xl font-bold">🛠 Strategy Backtester</h2>
-          <p class="text-slate-300 text-sm">Simulate SMA Crossover Strategy on data</p>
-        </div>
-        <div class="flex flex-wrap gap-3 items-end">
-          <div>
-            <label class="block text-xs text-slate-400">Mode</label>
-            <select id="btMode" class="bg-slate-800 border border-white/10 rounded px-2 py-1 text-sm text-white">
-              <option value="SYNTHETIC">Synthetic Data</option>
-              <option value="REAL">Current Symbol</option>
-            </select>
-          </div>
-          <div>
-            <label class="block text-xs text-slate-400">Short SMA</label>
-            <input type="number" id="btShort" value="10"
-              class="w-16 bg-transparent border border-white/10 rounded px-2 py-1 text-sm">
-          </div>
-          <div>
-            <label class="block text-xs text-slate-400">Long SMA</label>
-            <input type="number" id="btLong" value="50"
-              class="w-16 bg-transparent border border-white/10 rounded px-2 py-1 text-sm">
-          </div>
-          <div>
-            <label class="block text-xs text-slate-400">Capital ($)</label>
-            <input type="number" id="btCapital" value="10000" step="1000"
-              class="w-24 bg-transparent border border-white/10 rounded px-2 py-1 text-sm">
-          </div>
-          <button id="runBacktestBtn"
-            class="bg-pink-500 hover:bg-pink-600 text-white px-4 py-1.5 rounded-md font-semibold text-sm">
-            Run Backtest
-          </button>
-        </div>
-      </div>
 
-      <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        <!-- Metrics -->
-        <div class="lg:col-span-1 space-y-4">
-          <div class="bg-slate-800/50 p-4 rounded-lg">
-            <div class="text-xs text-slate-400">Total Return</div>
-            <div id="btReturn" class="text-2xl font-bold">--%</div>
-          </div>
-          <div class="bg-slate-800/50 p-4 rounded-lg">
-            <div class="text-xs text-slate-400">Max Drawdown</div>
-            <div id="btDrawdown" class="text-2xl font-bold text-red-400">--%</div>
-          </div>
-          <div class="bg-slate-800/50 p-4 rounded-lg">
-            <div class="text-xs text-slate-400">Trades Executed</div>
-            <div id="btTrades" class="text-2xl font-bold">--</div>
-          </div>
-          <div id="btMsg" class="text-xs text-amber-300"></div>
-        </div>
-
-        <!-- Backtest Chart -->
-        <div class="lg:col-span-3 bg-slate-800/30 rounded-lg p-2">
-          <canvas id="backtestChart" height="80"></canvas>
-        </div>
-      </div>
-    </section>
 
     <section class="glass rounded-xl p-4">
       <div class="flex items-center justify-between mb-2">

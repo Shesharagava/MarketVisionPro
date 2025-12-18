@@ -9,3 +9,5 @@ nltk
 vaderSentiment
 langchain-ollama
 langchain
+streamlit
+plotly

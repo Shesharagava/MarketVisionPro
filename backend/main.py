@@ -1,4 +1,5 @@
 from fastapi import FastAPI, Query
+
 from fastapi.middleware.cors import CORSMiddleware
 import yfinance as yf
 import pandas as pd
@@ -82,6 +83,10 @@ def predict_future(symbol: str = Query(...), days: int = Query(7)):
         if df.empty:
             return {"error": "No data available", "forecast": []}
 
+        # Flatten columns if MultiIndex (fix for new yfinance)
+        if isinstance(df.columns, pd.MultiIndex):
+            df.columns = df.columns.get_level_values(0)
+
         df = df.reset_index()
         df = df.rename(columns={"Date": "ds", "Close": "y"})
         df = df[["ds", "y"]]
@@ -101,7 +106,7 @@ def predict_future(symbol: str = Query(...), days: int = Query(7)):
         forecast = model.predict(future)
 
         results = forecast.tail(days)[["ds", "yhat", "yhat_lower", "yhat_upper"]]
-        results["ds"] = results["ds"].astype(str)
+        results["ds"] = results["ds"].dt.strftime('%Y-%m-%d')
         forecast_points = results.to_dict(orient="records")
 
         return {"symbol": symbol, "forecast": forecast_points}
@@ -132,14 +137,8 @@ def chat_endpoint(request: ChatRequest):
     try:
         sentiment = analyze_sentiment(request.message)
         
-        # Get response from the AI agent (which covers glossary + LLM)
         agent_resp = get_agent_response(request.message)
 
-        # Determine response-prefix based on sentiment (optional wrapper)
-        # We can append the sentiment analysis to the AI response or just return it in the structured field.
-        # The frontend uses 'response' for the main bubble.
-        
-        # Let's combine them gracefully:
         final_response = agent_resp
 
         return {
@@ -150,147 +149,7 @@ def chat_endpoint(request: ChatRequest):
         return {"error": str(e)}
 
 
-# -------------------------------------------------------------------
-# Backtesting / Strategy Logic
-# -------------------------------------------------------------------
 
-def synthetic_price_series(days=365, start_price=100.0, seed=42):
-    """Create a synthetic price series (close prices) for quick backtest/demos."""
-    np.random.seed(seed)
-    # Generate dates. Note: This simple method doesn't skip weekends/holidays, 
-    # but sufficient for synthetic demo.
-    dates = [datetime.date.today() - datetime.timedelta(days=i) for i in range(days)]
-    dates.reverse()
-    
-    # Geometric random walk
-    returns = np.random.normal(loc=0.0005, scale=0.02, size=days)
-    prices = start_price * np.exp(np.cumsum(returns))
-    
-    df = pd.DataFrame({"ds": dates, "y": prices})
-    df.set_index("ds", inplace=True)
-    return df
-
-def sma(series, window):
-    return series.rolling(window).mean()
-
-def compute_metrics(trades, portfolio_values):
-    # Simple metrics: total return, max drawdown
-    if not portfolio_values:
-        return {}
-    start = portfolio_values[0]
-    end = portfolio_values[-1]
-    total_return = (end / start) - 1.0
-    
-    # max drawdown
-    vals = np.array(portfolio_values)
-    running_max = np.maximum.accumulate(vals)
-    # Avoid division by zero
-    running_max[running_max == 0] = 1 
-    drawdowns = (vals - running_max) / running_max
-    max_drawdown = float(np.min(drawdowns))
-    
-    return {
-        "total_return": float(round(total_return * 100, 2)), 
-        "max_drawdown": float(round(max_drawdown * 100, 2)), 
-        "trades_count": len(trades)
-    }
-
-class BacktestRequest(BaseModel):
-    symbol: str = "SYNTHETIC"
-    sma_short: int = 10
-    sma_long: int = 50
-    capital: float = 10000.0
-    days: int = 365
-
-@app.post("/api/backtest")
-def run_backtest(req: BacktestRequest):
-    try:
-        # 1. Get Data
-        if req.symbol.upper() == "SYNTHETIC":
-            df = synthetic_price_series(days=req.days, start_price=100.0)
-            # rename for consistency
-            prices = df["y"]
-        else:
-            # Fetch real data for larger period to ensure enough for lag
-            # Note: yfinance auto-adjusts for weekends, so len might be < days
-            ticker = yf.Ticker(req.symbol)
-            hist = ticker.history(period="2y", interval="1d")
-            if hist.empty:
-                return {"error": "No data found for symbol"}
-            
-            # We take the last N days requested, but need extra for SMA calculation
-            hist = hist.tail(req.days + req.sma_long + 10)
-            prices = hist["Close"]
-            # Convert index to date only if it's datetime
-            prices.index = [d.date() for d in prices.index]
-
-        # 2. Compute Indicators
-        short_sma = sma(prices, req.sma_short)
-        long_sma = sma(prices, req.sma_long)
-
-        # 3. Simulate Strategy
-        position = 0  # 0 = cash, 1 = invested
-        cash = req.capital
-        shares = 0
-        portfolio_values = []
-        equity_curve = [] # list of {time, value}
-        trades = []
-
-        # We iterate through the series. 
-        # We need to align everything. 
-        # Let's drop NaN from SMAs first to start trading when valid
-        valid_indices = short_sma.dropna().index.intersection(long_sma.dropna().index)
-        
-        # We only trade on valid days
-        for date in valid_indices:
-            price = float(prices.loc[date])
-            s = short_sma.loc[date]
-            l = long_sma.loc[date]
-            
-            # Signal Logic
-            # BUY if Short > Long and we have no position
-            if s > l and position == 0:
-                shares = cash / price
-                cash = 0
-                position = 1
-                trades.append({
-                    "date": str(date), 
-                    "type": "BUY", 
-                    "price": round(price, 2), 
-                    "shares": round(shares, 4)
-                })
-            
-            # SELL if Short < Long and we have position
-            elif s < l and position == 1:
-                cash = shares * price
-                shares = 0
-                position = 0
-                trades.append({
-                    "date": str(date), 
-                    "type": "SELL", 
-                    "price": round(price, 2), 
-                    "value": round(cash, 2)
-                })
-            
-            # Update Portfolio Value
-            current_val = cash + (shares * price)
-            portfolio_values.append(current_val)
-            equity_curve.append({"time": str(date), "value": round(current_val, 2)})
-
-        # 4. Finalize
-        # Force sell at end to get final cash value if holding? 
-        # Or just value it.
-        metrics = compute_metrics(trades, portfolio_values)
-
-        return {
-            "symbol": req.symbol,
-            "metrics": metrics,
-            "trades": trades[-50:], # limit size
-            "equity_curve": equity_curve
-        }
-
-    except Exception as e:
-        return {"error": str(e)}
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)
